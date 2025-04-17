@@ -1,0 +1,25 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "planet_manager"
+description = "Planet Manager. A wrapper around the planet.com subscription API, to more easily manage subscriptions"
+authors = [
+	{ name = "Tjaart van der Walt", email = "tjaart@ucsb.edu" },
+	{ name = "Narjes Mathlouthi", email = "nmathlouthi@umail.ucsb.edu" },
+]
+dynamic = ["version"]
+dependencies = [
+	"colorama",
+	"geojson",
+	"planet @ git+https://github.com/planetlabs/planet-client-python@main",
+  "python-dateutil",
+  "python-dotenv",
+	"pyxdg",
+	"pyyaml",
+	"typer",
+]
+
+[project.scripts]
+pman = "planet_manager:main"

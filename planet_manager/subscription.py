@@ -1,48 +1,43 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
-import planet
 from dateutil.parser import parse
 from planet.subscription_request import build_request, catalog_source, s3_compatible
 
+from planet_manager.session import session
 
+pl = session()
+
+
+@dataclass
 class CatalogSource:
-    def __init__(
-        self,
-        item_types=["PSScene"],
-        asset_types=[
+    item_types: list[str] = field(default_factory=["PSScene"])
+    asset_types: list[str] = field(
+        default_factory=[
             "ortho_analytic_8b",
             "ortho_analytic_8b_sr",
             "ortho_analytic_8b_xml",
             "ortho_udm2",
-        ],
-        geometry=[],
-        start_time=datetime(2000, 1, 1),
-        filter=None,
-        end_time: datetime | None = datetime(2026, 1, 31),
-        publishing_stages="standard",
-        time_range_type="published",
-    ):
-        self.__item_types = item_types
-        self.__asset_types = asset_types
-        self.__geometry = geometry
-        self.__start_time = start_time
-        self.__filter = filter
-        self.__end_time = end_time
-        self.__publishing_stages = publishing_stages
-        self.__time_range_type = time_range_type
+        ]
+    )
+    geometry: list = field(default_factory=[])
+    start_time: datetime = datetime(2000, 1, 1)
+    filter: list[dict] | None = None
+    end_time: datetime | None = None
+    publishing_stages: list[str] = field(default_factory=["standard"])
+    time_range_type: str = "published"
 
     @property
     def source(self):
         return catalog_source(
-            self.__item_types,
-            self.__asset_types,
-            self.__geometry,
-            self.__start_time,
-            filter=self.__filter,
-            end_time=self.__end_time,
-            publishing_stages=self.__publishing_stages,
-            time_range_type=self.__time_range_type,
+            self.item_types,
+            self.asset_types,
+            self.geometry,
+            self.start_time,
+            filter=self.filter,
+            end_time=self.end_time,
+            publishing_stages=self.publishing_stages,
+            time_range_type=self.time_range_type,
         )
 
     def cancel(input: dict):
@@ -54,46 +49,38 @@ class CatalogSource:
         end_time = parse(end_time) if end_time else None
 
         return CatalogSource(
-            input["parameters"]["item_types"],
-            input["parameters"]["asset_types"],
-            input["parameters"]["geometry"],
-            parse(input["parameters"]["start_time"]),
-            end_time,
-            input["parameters"]["publishing_stages"],
+            item_types=input["parameters"]["item_types"],
+            asset_types=input["parameters"]["asset_types"],
+            geometry=input["parameters"]["geometry"],
+            start_time=parse(input["parameters"]["start_time"]),
+            end_time=end_time,
+            publishing_stages=input["parameters"]["publishing_stages"],
         )
 
 
+@dataclass
 class S3CompatibleDelivery:
-    def __init__(
-        self,
-        endpoint,
-        bucket,
-        region,
-        access_key_id,
-        secret_access_key,
-        use_path_style=True,
-    ):
-        self.__endpoint = endpoint
-        self.__bucket = bucket
-        self.__region = region
-        self.__access_key_id = access_key_id
-        self.__secret_access_key = secret_access_key
-        self.__use_path_style = use_path_style
+    endpoint: str
+    bucket: str
+    region: str
+    access_key_id: str
+    secret_access_key: str
+    use_path_style: bool
 
     @property
     def delivery(self):
         return s3_compatible(
-            self.__endpoint,
-            self.__bucket,
-            self.__region,
-            self.__access_key_id,
-            self.__secret_access_key,
-            self.__use_path_style,
+            self.endpoint,
+            self.bucket,
+            self.region,
+            self.access_key_id,
+            self.secret_access_key,
+            self.use_path_style,
         )
 
     @staticmethod
     def load(input: dict):
-        use_path_style = input["parameters"].get("use_path_style", None)
+        use_path_style = input["parameters"].get("use_path_style", False)
 
         return S3CompatibleDelivery(
             input["parameters"]["endpoint"],
@@ -105,10 +92,10 @@ class S3CompatibleDelivery:
         )
 
 
+@dataclass
 class Links:
-    def __init__(self, index, results):
-        self.__index = index
-        self.__results = results
+    index: str
+    results: str
 
     @staticmethod
     def load(input: dict):
@@ -129,7 +116,11 @@ class Subscription:
     id: str | None = None
     updated: datetime | None = None
 
-    pl = planet.Planet()
+    @staticmethod
+    def load_by_id(id: str):
+        subscription = pl.subscriptions.get_subscription(id)
+
+        return Subscription.load(subscription)
 
     @staticmethod
     def load(input: dict):
@@ -150,7 +141,7 @@ class Subscription:
             self.name, source=self.source.source, delivery=self.delivery.delivery
         )
 
-        subscription = self.pl.subscriptions.create_subscription(request)
+        subscription = pl.subscriptions.create_subscription(request)
         #
         # self = Subscription.load(subscription)
         #

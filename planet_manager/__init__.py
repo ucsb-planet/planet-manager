@@ -3,7 +3,6 @@ from datetime import datetime
 
 import geojson
 import typer
-from colorama import Fore, Style
 
 from planet_manager.config import config
 from planet_manager.filters import Filters
@@ -14,7 +13,11 @@ from planet_manager.subscription import (
     Subscription,
 )
 from planet_manager.subscriptions import Subscriptions
-from planet_manager.utils import extract_geometry
+from planet_manager.utils import (
+    subscriptions_list,
+    extract_geometry,
+    subscription_status,
+)
 
 pl = session()
 
@@ -22,8 +25,9 @@ app = typer.Typer()
 
 
 @app.command()
-def sync(item: str):
-    print(f"Syncing the API status")
+def status(id: str):
+    subscription = Subscription.load_by_id(id)
+    print(subscription_status(subscription))
 
 
 @app.command()
@@ -38,17 +42,7 @@ def list(cancelled: bool = False):
     if not cancelled:
         subscriptions = filter(lambda x: x.status != "cancelled", subscriptions)
 
-    print(f"{'ID':<36} | {'Created':<19} | {'Status':<10} | Name")
-    print("-" * 120)
-    for subscription in subscriptions:
-        print(
-            f"{Style.RESET_ALL + subscription.id:<36} {Style.RESET_ALL + '|'} {
-                Fore.LIGHTBLUE_EX
-                + subscription.created.strftime('%Y-%m-%d %H:%M:%S'):<19
-            } {Style.RESET_ALL + '|'} {Fore.LIGHTMAGENTA_EX + subscription.status:<15} {
-                Style.RESET_ALL + '|'
-            } {Fore.GREEN + subscription.name:<10}"
-        )
+    print(subscriptions_list(subscriptions))
 
 
 @app.command()

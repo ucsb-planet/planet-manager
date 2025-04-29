@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime
 
@@ -14,9 +15,9 @@ from planet_manager.subscription import (
 )
 from planet_manager.subscriptions import Subscriptions
 from planet_manager.utils import (
-    subscriptions_list,
     extract_geometry,
     subscription_status,
+    subscriptions_list,
 )
 
 pl = session()
@@ -40,7 +41,8 @@ def list(cancelled: bool = False):
     subscriptions = Subscriptions.load(subscriptions_json)
 
     if not cancelled:
-        subscriptions = filter(lambda x: x.status != "cancelled", subscriptions)
+        subscriptions = filter(lambda x: x.status !=
+                               "cancelled", subscriptions)
 
     print(subscriptions_list(subscriptions))
 
@@ -70,31 +72,95 @@ def add(
 
     geometry = extract_geometry(geojson_str)
 
-    start_time_obj = datetime.strptime(start_time, "%Y-%m-%d")
-    end_time_obj = datetime.strptime(end_time, "%Y-%m-%d")
-
     source = CatalogSource(
+        item_types=["PSScene"],
+        asset_types=[
+            "ortho_analytic_8b",
+            "ortho_analytic_8b_sr",
+            "ortho_analytic_8b_xml",
+            "ortho_udm2",
+        ],
         geometry=geometry,
-        start_time=start_time_obj,
+        start_time=datetime.strptime(start_time, "%Y-%m-%d"),
         filter=Filters.base_filter,
-        end_time=end_time_obj,
+        end_time=datetime.strptime(end_time, "%Y-%m-%d"),
         publishing_stages=["standard"],
         time_range_type=time_range_type,
     )
 
-    conf = config()
+    obj_conf = config().get("object_storage")
 
     delivery = S3CompatibleDelivery(
-        conf.get("endpoint"),
-        conf.get("bucket"),
-        conf.get("region"),
-        conf.get("access_key_id"),
-        conf.get("secret_access_key"),
-        conf.get("use_style_path"),
+        obj_conf.get("endpoint"),
+        obj_conf.get("bucket"),
+        obj_conf.get("region"),
+        obj_conf.get("access_key_id"),
+        obj_conf.get("secret_access_key"),
+        obj_conf.get("use_style_path"),
     )
 
     subscription = Subscription(name, source, delivery)
+
     subscription.subscribe()
+
+
+@app.command()
+def update(
+    id: str,
+    name: str,
+    geojson_file: str | None = None,
+    start_time: str = "2000-01-01",
+    end_time: str = "2026-02-01",
+    time_range_type: str = "published",
+):
+    """
+    Update subscription
+    """
+    subscription = Subscription.load_by_id(id)
+
+    subscription.name = name
+
+    obj_conf = config().get("object_storage")
+
+    delivery = S3CompatibleDelivery(
+        obj_conf.get("endpoint"),
+        obj_conf.get("bucket"),
+        obj_conf.get("region"),
+        obj_conf.get("access_key_id"),
+        obj_conf.get("secret_access_key"),
+        obj_conf.get("use_style_path"),
+    )
+    subscription.delivery = delivery
+
+    geometry = None
+    if geojson_file:
+        with open(geojson_file, "r") as file:
+            geojson_str = geojson.load(file)
+
+        geometry = extract_geometry(geojson_str)
+
+    source = CatalogSource(
+        item_types=["PSScene"],
+        asset_types=[
+            "ortho_analytic_8b",
+            "ortho_analytic_8b_sr",
+            "ortho_analytic_8b_xml",
+            "ortho_udm2",
+        ],
+        geometry=geometry,
+        start_time=datetime.strptime(start_time, "%Y-%m-%d"),
+        filter=Filters.base_filter,
+        end_time=datetime.strptime(end_time, "%Y-%m-%d"),
+        publishing_stages=["standard"],
+        time_range_type=time_range_type,
+    )
+    subscription.source = source
+
+    subscription.update()
+
+    #
+    # subscription = Subscription(name, source, delivery)
+    # subscription.patch .subscribe()
 
 
 def main():

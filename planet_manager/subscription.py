@@ -11,21 +11,14 @@ pl = session()
 
 @dataclass
 class CatalogSource:
-    item_types: list[str] = field(default_factory=["PSScene"])
-    asset_types: list[str] = field(
-        default_factory=[
-            "ortho_analytic_8b",
-            "ortho_analytic_8b_sr",
-            "ortho_analytic_8b_xml",
-            "ortho_udm2",
-        ]
-    )
-    geometry: list = field(default_factory=[])
-    start_time: datetime = datetime(2000, 1, 1)
-    filter: list[dict] | None = None
-    end_time: datetime | None = None
-    publishing_stages: list[str] = field(default_factory=["standard"])
-    time_range_type: str = "published"
+    item_types: list[str]
+    asset_types: list[str]
+    geometry: list | None
+    start_time: datetime | None
+    filter: list[dict] | None
+    end_time: str | None
+    publishing_stages: list[str] | None
+    time_range_type: str | None
 
     @property
     def source(self):
@@ -45,16 +38,18 @@ class CatalogSource:
 
     @staticmethod
     def load(input: dict):
-        end_time = input["parameters"].get("end_time", None)
-        end_time = parse(end_time) if end_time else None
+        # end_time = input["parameters"].get("end_time", None)
+        # end_time = parse(end_time) if end_time else None
 
         return CatalogSource(
             item_types=input["parameters"]["item_types"],
             asset_types=input["parameters"]["asset_types"],
             geometry=input["parameters"]["geometry"],
-            start_time=parse(input["parameters"]["start_time"]),
-            end_time=end_time,
+            start_time=input["parameters"].get("start_time", None),
+            filter=input["parameters"].get("filter", None),
+            end_time=input["parameters"].get("end_time", None),
             publishing_stages=input["parameters"]["publishing_stages"],
+            time_range_type=input["parameters"]["time_range_type"],
         )
 
 
@@ -108,13 +103,33 @@ class Links:
 @dataclass
 class Subscription:
     name: str
-    source: CatalogSource
-    delivery: S3CompatibleDelivery
+    _source: CatalogSource
+    _delivery: S3CompatibleDelivery
     created: datetime | None = None
     links: Links | None = None
     status: str | None = None
     id: str | None = None
     updated: datetime | None = None
+
+    @property
+    def delivery(self) -> str:
+        return self._delivery
+
+    @delivery.setter
+    def delivery(self, v: S3CompatibleDelivery) -> None:
+        for key, value in vars(v).items():
+            if value:
+                self.delivery.__setattr__(key, value)
+
+    @property
+    def source(self) -> str:
+        return self._source
+
+    @source.setter
+    def source(self, v: CatalogSource) -> None:
+        for key, value in vars(v).items():
+            if value:
+                self.source.__setattr__(key, value)
 
     @staticmethod
     def load_by_id(id: str):
@@ -136,13 +151,16 @@ class Subscription:
         )
 
     def subscribe(self):
-        print(self.source.source)
         request = build_request(
             self.name, source=self.source.source, delivery=self.delivery.delivery
         )
 
-        subscription = pl.subscriptions.create_subscription(request)
-        #
-        # self = Subscription.load(subscription)
-        #
-        # return self
+        pl.subscriptions.create_subscription(request)
+
+    def update(self):
+        request = build_request(
+            self.name, source=self.source.source, delivery=self.delivery.delivery
+        )
+
+        pl.subscriptions.update_subscription(self.id, request)
+

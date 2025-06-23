@@ -4,6 +4,7 @@ from planet_manager.subscription import Subscription
 from colorama import Fore, Style
 
 from planet_manager.collections import Collections
+from planet_manager.features import Features
 
 
 def extract_geometry(data: dict) -> dict:
@@ -69,5 +70,13 @@ def collections_list(collections: Collections):
             Fore.LIGHTMAGENTA_EX + collection.description:<40} {
             Style.RESET_ALL + '|'
         }  {Fore.LIGHTBLUE_EX + collection.created.strftime('%Y-%m-%d %H:%M:%S'):<20}\n"
+
+    return out
+
+def features_list(features: Features):
+    out = f"{'ID'}\n{'-' * 40}\n"
+
+    for feature in features:
+        out += f"{Style.RESET_ALL + feature.id}\n"
 
     return out

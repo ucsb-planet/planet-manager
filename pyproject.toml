@@ -22,4 +22,4 @@ dependencies = [
 ]
 
 [project.scripts]
-pman = "planet_manager:main"
+pman = "planet_manager.commands:main"
